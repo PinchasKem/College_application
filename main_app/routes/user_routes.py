@@ -1,7 +1,7 @@
 from flask import jsonify, request, Blueprint
-from flask_jwt_extended import jwt_required, create_access_token, create_refresh_token, get_jwt_identity, get_jwt
+from flask_jwt_extended import jwt_required, create_access_token, create_refresh_token, get_jwt_identity
 from main_app.services.user_service import UserService
-from werkzeug.exceptions import BadRequest, NotFound, Unauthorized, Forbidden
+from werkzeug.exceptions import BadRequest, NotFound, Forbidden
 from .permissions.decorators import admin_required , is_authorized_admin_email
 
 user_routes = Blueprint('user', __name__)
@@ -55,7 +55,7 @@ def login():
         if user:
             access_token = create_access_token(identity=user.id, additional_claims={
                 "is_admin": user.is_admin,
-                "is_staff": user.is_staff_member,
+                "is_staff_member": user.is_staff_member,
                 "is_student": user.is_student,
                 "is_guest": user.is_guest
             })
@@ -154,7 +154,7 @@ def refresh():
     user = UserService.get_user_by_id(current_user_id)
     new_access_token = create_access_token(identity=current_user_id, additional_claims={
         "is_admin": user.is_admin,
-        "is_staff": user.is_staff_member,
+        "is_staff_member": user.is_staff_member,
         "is_student": user.is_student,
         "is_guest": user.is_guest
     })
