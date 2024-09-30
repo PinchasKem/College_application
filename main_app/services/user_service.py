@@ -80,38 +80,40 @@ class UserService:
         return User.query.all()
     
     @staticmethod
-    def update_user(email, password, username=None, new_email=None, class_cycle=None, new_password=None, is_student=False, is_staff_member=False, is_admin=False, is_guest=False):
-        user = User.query.filter_by(email=email).first()
-        if user and user.check_password(password):
-            if username:
-                user.username = username
-            if new_email:
-                user.email = new_email
-            if class_cycle is not None:
-                user.class_cycle = class_cycle
-            if new_password:
-                user.set_password(new_password)
-            
-            if is_admin or is_guest or is_staff_member or is_student:
-                user.is_student = is_student
-                user.is_staff_member = is_staff_member
-                user.is_admin = is_admin
-                user.is_guest = is_guest
-        
-            try:
-                db.session.commit()
-                return user
-            except IntegrityError:
-                db.session.rollback()
-                return None
-        else:
+    def get_user_by_id(id):
+        return User.query.filter_by(id=id).first()
+    
+    @staticmethod
+    def update_user(user_id, data):
+        user = User.query.get(user_id)
+        if not user:
             return None
+        if 'username' in data:
+            user.username = data['username']
+        if 'new_email' in data:
+            user.email = data['new_email']
+        if 'class_cycle' in data:
+            user.class_cycle = data['class_cycle']
+        if 'new_password' in data:
+            user.set_password(data['new_password'])
+        
+        user.is_student = data.get('is_student', user.is_student)
+        user.is_staff_member = data.get('is_staff_member', user.is_staff_member)
+        user.is_admin = data.get('is_admin', user.is_admin)
+        user.is_guest = data.get('is_guest', user.is_guest)
 
+        try:
+            db.session.commit()
+            return user
+        except IntegrityError:
+            db.session.rollback()
+            return None
+        
     @staticmethod
     def is_admin(id):
         user = User.query.filter_by(id=id).first()
         return user.is_admin
-    
+        
     @staticmethod
     def is_staff_member(id):
         user = User.query.filter_by(id=id).first()
