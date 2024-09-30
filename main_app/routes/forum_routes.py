@@ -146,7 +146,7 @@ def add_attachment(post_id):
 @forum_routes.route('/attachments/<int:attachment_id>', methods=['DELETE'])
 def delete_attachment(attachment_id):
     try:
-        user_id = request.headers.get('User-ID')  # Assuming user ID is sent in headers
+        user_id = request.headers.get('User-ID') 
         if not UserService.is_admin(user_id):
             raise Unauthorized("Only admins can delete attachments")
 
