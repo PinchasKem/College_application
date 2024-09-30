@@ -2,20 +2,9 @@ from flask import jsonify, request, Blueprint
 from flask_jwt_extended import jwt_required, create_access_token, create_refresh_token, get_jwt_identity, get_jwt
 from main_app.services.user_service import UserService
 from werkzeug.exceptions import BadRequest, NotFound, Unauthorized, Forbidden
-from functools import wraps
+from .permissions.decorators import admin_required , is_authorized_admin_email
 
 user_routes = Blueprint('user', __name__)
-
-def admin_required():
-    def wrapper(fn):
-        @wraps(fn)
-        def decorator(*args, **kwargs):
-            claims = get_jwt()
-            if not claims.get("is_admin", False):
-                raise Forbidden("Admin access required")
-            return fn(*args, **kwargs)
-        return decorator
-    return wrapper
 
 @user_routes.route('/users', methods=['POST'])
 def create_user():
@@ -25,7 +14,11 @@ def create_user():
             raise BadRequest("Username, email, password, and user_type are required")
 
         user_type = data['user_type']
-        if user_type not in ['is_guest', 'is_student']:
+        if user_type == 'is_admin':
+            if not is_authorized_admin_email(data['email']):
+                raise BadRequest("Unauthorized email for admin registration")
+            
+        if user_type not in ['is_guest', 'is_student', 'is_admin']:
             raise BadRequest("Invalid user_type. Must be 'guest' or 'student'")
 
         if user_type == 'is_student' and 'class_cycle' not in data:
@@ -38,7 +31,7 @@ def create_user():
             data['password'],
             is_student=(user_type == 'is_student'),
             is_staff_member=False,
-            is_admin=False,
+            is_admin=(user_type == 'is_admin'),
             is_guest=(user_type == 'is_guest')
         )
         
@@ -93,7 +86,6 @@ def get_users():
         return jsonify({"error": str(e)}), 500
 
 @user_routes.route('/users/<int:user_id>', methods=['GET'])
-@jwt_required()
 def get_user(user_id):
     try:
         user = UserService.get_user_by_id(user_id)
@@ -138,14 +130,12 @@ def update_user(user_id):
 def update_user_role(user_id):
     try:
         data = request.json
-        if 'role' not in data:
-            raise BadRequest("Role is required")
+        valid_roles = ['is_admin', 'is_staff_member', 'is_student', 'is_guest']
         
-        role = data['role']
-        if role not in ['admin', 'staff', 'student']:
-            raise BadRequest("Invalid role")
+        if not any(role in data for role in valid_roles):
+            raise BadRequest("At least one valid role (is_admin, is_staff_member, is_student, or is_guest) is required")
         
-        updated_user = UserService.update_user_role(user_id, role)
+        updated_user = UserService.update_user(user_id, data)
         if updated_user:
             return jsonify(updated_user.to_dict()), 200
         else:
