@@ -2,7 +2,7 @@ from flask import jsonify, request, Blueprint
 from flask_jwt_extended import jwt_required, create_access_token, create_refresh_token, get_jwt_identity
 from main_app.services.user_service import UserService
 from werkzeug.exceptions import BadRequest, NotFound, Forbidden
-from .permissions.decorators import admin_required , is_authorized_admin_email
+from .permissions.permissions import  is_authorized_admin_email
 
 user_routes = Blueprint('user', __name__)
 
@@ -126,9 +126,13 @@ def update_user(user_id):
 
 @user_routes.route('/users/<int:user_id>/role', methods=['PUT'])
 @jwt_required()
-@admin_required()
 def update_user_role(user_id):
     try:
+        current_user_id = get_jwt_identity()
+        user = UserService.get_user_by_id(current_user_id)
+        if not user.is_admin:
+            raise Forbidden("Only the author or admin can edit this post")
+        
         data = request.json
         valid_roles = ['is_admin', 'is_staff_member', 'is_student', 'is_guest']
         

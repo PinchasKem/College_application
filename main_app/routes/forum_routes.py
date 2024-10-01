@@ -1,7 +1,11 @@
 from flask import jsonify, request, Blueprint, current_app
+from flask_jwt_extended import get_jwt_identity, jwt_required
+from main_app.models.models import User, ForumPost
 from main_app.services.forum_service import ForumService
 from main_app.services.user_service import UserService
-from werkzeug.exceptions import BadRequest, NotFound, Unauthorized
+from werkzeug.exceptions import BadRequest, NotFound, Unauthorized, Forbidden
+
+
 
 forum_routes = Blueprint('forum', __name__)
 
@@ -18,14 +22,21 @@ def get_all_posts():
         return jsonify({"error": str(e)}), 500
 
 @forum_routes.route('/posts', methods=['POST'])
+@jwt_required
 def create_post():
     try:
         data = request.json
-        if not data or 'title' not in data or 'content' not in data or 'author_id' not in data:
-            raise BadRequest("Title, content, and author_id are required")
+        if not data or 'title' not in data or 'content' not in data:
+            raise BadRequest("Title and content are required")
         
+        current_user = get_jwt_identity()
+        
+        existing_post = ForumPost.query.filter_by(title=data['title']).first()
+        if existing_post:
+            raise ValueError("כותרת זו כבר קיימת. אנא בחר כותרת אחרת.")
+
         forum_service = get_forum_service()
-        post = forum_service.create_post(data['title'], data['content'], data['author_id'], data.get('cluster_id'))
+        post = forum_service.create_post(data['title'], data['content'], current_user, data.get('cluster_id'))
         return jsonify(post.to_dict()), 201
     except BadRequest as e:
         return jsonify({"error": str(e)}), 400
@@ -33,6 +44,7 @@ def create_post():
         return jsonify({"error": str(e)}), 500
 
 @forum_routes.route('/posts/<int:post_id>', methods=['PUT'])
+@jwt_required()
 def update_post(post_id):
     try:
         data = request.json
@@ -40,12 +52,16 @@ def update_post(post_id):
             raise BadRequest("No data provided")
         
         forum_service = get_forum_service()
-        post = forum_service.get_post(post_id)
+        post = forum_service.get_post_by_id(post_id)
+        
         if not post:
             raise NotFound("Post not found")
-        
-        if post.author_id != data.get('author_id'):
-            raise Unauthorized("Only the author can edit this post")
+
+        current_user_id = get_jwt_identity()
+        current_user = User.query.filter_by(id=current_user_id).first()
+
+        if current_user_id != post.author_id or not current_user.is_admin:
+            raise Forbidden("Only the author or admin can edit this post")
         
         updated_post = forum_service.update_post(post_id, data.get('title'), data.get('content'))
         return jsonify(updated_post.to_dict()), 200
@@ -59,13 +75,25 @@ def update_post(post_id):
         return jsonify({"error": str(e)}), 500
 
 @forum_routes.route('/posts/<int:post_id>', methods=['DELETE'])
+@jwt_required()
 def delete_post(post_id):
     try:
-        user_id = request.headers.get('User-ID')  
-        if not UserService.is_admin(user_id):
-            raise Unauthorized("Only admins can delete posts")
-
+        data = request.json
+        if not data:
+            raise BadRequest("No data provided")
+        
         forum_service = get_forum_service()
+        post = forum_service.get_post_by_id(post_id)
+        
+        if not post:
+            raise NotFound("Post not found")
+
+        current_user_id = get_jwt_identity()
+        current_user = User.query.filter_by(id=current_user_id).first()
+
+        if current_user_id != post.author_id or not current_user.is_admin:
+            raise Forbidden("Only the author or admin can edit this post")
+
         forum_service.delete_post(post_id)
         return '', 204
     except NotFound as e:
@@ -75,30 +103,36 @@ def delete_post(post_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@forum_routes.route('/posts/<int:post_id>/replies', methods=['POST'])
+@forum_routes.route('/posts/<int:post_id>/replies', methods=['POST'], endpoint='create_reply')
+@jwt_required
 def create_reply(post_id):
     try:
         data = request.json
-        if not data or 'content' not in data or 'author_id' not in data:
-            raise BadRequest("Content and author_id are required")
+        if not data or 'content' not in data:
+            raise BadRequest("Content are required")
         
+        current_user_id = get_jwt_identity()
+
         forum_service = get_forum_service()
-        reply = forum_service.create_reply(data['content'], data['author_id'], post_id)
+        reply = forum_service.create_reply(data['content'], current_user_id, post_id)
         return jsonify(reply.to_dict()), 201
     except BadRequest as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@forum_routes.route('/clusters', methods=['POST'])
+@forum_routes.route('/clusters', methods=['POST'], endpoint='create_cluster')
+@jwt_required
 def create_cluster():
     try:   
         data = request.json
         if not data or 'name' not in data:
             raise BadRequest("Cluster name is required")
         
+        current_user = get_jwt_identity()
+
         forum_service = get_forum_service()
-        cluster = forum_service.create_cluster(data['name'], data.get('description'))
+        cluster = forum_service.create_cluster(data['name'], data.get('description'), current_user)
         return jsonify(cluster.to_dict()), 201
     except Unauthorized as e:
         return jsonify({"error": str(e)}), 403

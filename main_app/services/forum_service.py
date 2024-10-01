@@ -1,4 +1,3 @@
-from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
 from sqlalchemy.exc import SQLAlchemyError
@@ -66,7 +65,7 @@ class ForumService:
     @staticmethod
     def create_cluster(name, user_id, description=None):
         try:
-            new_cluster = ForumCluster(name=name, author_id=user_id, description=description)
+            new_cluster = ForumCluster(name=name, description=description, author_id=user_id)
             db.session.add(new_cluster)
             db.session.commit()
             return new_cluster
@@ -86,7 +85,69 @@ class ForumService:
         except SQLAlchemyError as e:
             db.session.rollback()
             raise Exception(f"Error deleting cluster: {str(e)}")
-        
+
+    @staticmethod
+    def get_all_posts():
+        return  ForumPost.query.all()
+    
+    @staticmethod
+    def get_post_by_id(id):
+        return  ForumPost.query.filter_by(id=id).first()
+
+    @staticmethod
+    def get_all_clusters():
+        return ForumCluster.query.all()
+    
+    @staticmethod
+    def update_post(post_id, title=None, content=None):
+        try:
+            post = ForumPost.query.get(post_id)
+            if not post:
+                raise Exception("Post not found")
+            
+            if title is not None:
+                post.title = title
+            if content is not None:
+                post.content = content
+            
+            db.session.commit()
+            return post
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            raise Exception(f"Error updating post: {str(e)}")
+
+    @staticmethod
+    def update_reply(reply_id, content):
+        try:
+            reply = ForumReply.query.get(reply_id)
+            if not reply:
+                raise Exception("Reply not found")
+            
+            reply.content = content
+            db.session.commit()
+            return reply
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            raise Exception(f"Error updating reply: {str(e)}")
+
+    @staticmethod
+    def update_cluster(cluster_id, name=None, description=None):
+        try:
+            cluster = ForumCluster.query.get(cluster_id)
+            if not cluster:
+                raise Exception("Cluster not found")
+            
+            if name is not None:
+                cluster.name = name
+            if description is not None:
+                cluster.description = description
+            
+            db.session.commit()
+            return cluster
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            raise Exception(f"Error updating cluster: {str(e)}")
+
     @staticmethod
     def add_attachment_to_post(self, post_id, filename, file_content, file_type):
         try:
