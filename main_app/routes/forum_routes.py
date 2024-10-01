@@ -103,7 +103,7 @@ def delete_post(post_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@forum_routes.route('/posts/<int:post_id>/replies', methods=['POST'])
+@forum_routes.route('/posts/<int:post_id>/replies', methods=['POST'], endpoint='create_reply')
 @jwt_required
 def create_reply(post_id):
     try:
@@ -121,7 +121,7 @@ def create_reply(post_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@forum_routes.route('/clusters', methods=['POST'])
+@forum_routes.route('/clusters', methods=['POST'], endpoint='create_cluster')
 @jwt_required
 def create_cluster():
     try:   
