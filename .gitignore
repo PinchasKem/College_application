@@ -20,7 +20,9 @@ ENV/
 # Logs
 *.log
 
-# Database
+# Database files
+instance/local_database.db
+*.db
 *.sqlite3
 
 # OS generated files

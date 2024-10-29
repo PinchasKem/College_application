@@ -54,7 +54,7 @@ class Attachment(db.Model):
     post_id = db.Column(db.Integer, db.ForeignKey('forum_post.id'), nullable=True)
     reply_id = db.Column(db.Integer, db.ForeignKey('forum_reply.id'), nullable=True)
 
-    def __init__(self, filename, s3_key, file_type, file_size, post_id, reply_id):
+    def __init__(self, filename, s3_key, file_type, file_size, post_id=None, reply_id=None):
         self.filename = filename
         self.s3_key = s3_key
         self.file_type = file_type

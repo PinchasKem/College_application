@@ -3,11 +3,15 @@ from botocore.exceptions import ClientError
 from sqlalchemy.exc import SQLAlchemyError
 from main_app.models.models import ForumPost, ForumReply, ForumCluster, Attachment
 from main_app.extensions import db
-
+from flask import current_app
 
 class ForumService:
     def __init__(self, s3_bucket_name):
-        self.s3_client = boto3.client('s3')
+        self.s3_client = boto3.client('s3',
+            region_name=current_app.config['AWS_REGION'],
+            aws_access_key_id=current_app.config['AWS_ACCESS_KEY_ID'],
+            aws_secret_access_key=current_app.config['AWS_SECRET_ACCESS_KEY']
+        )
         self.s3_bucket_name = s3_bucket_name
 
     @staticmethod
@@ -178,24 +182,20 @@ class ForumService:
             db.session.rollback()
             raise Exception(f"Error updating cluster: {str(e)}")
 
-    @staticmethod
-    def add_attachment_to_post(post_id, filename, file_content, file_type):
+
+    def add_attachment_to_post(self, post_id, filename, file_content, file_type):
         try:
-            logger.info(f"Starting add_attachment_to_post for post {post_id}")
             post = ForumPost.query.get(post_id)
             if not post:
-                logger.warning(f"Post {post_id} not found")
-                raise NotFound("Post not found")
+                raise Exception("Post not found")
             
             # יצירת מפתח ייחודי עבור S3
             s3_key = f"attachments/{post_id}/{filename}"
 
             # העלאת הקובץ ל-S3
             try:
-                logger.info(f"Uploading file to S3: {s3_key}")
-                s3_client.put_object(Bucket=s3_bucket_name, Key=s3_key, Body=file_content)
+                self.s3_client.put_object(Bucket=self.s3_bucket_name, Key=s3_key, Body=file_content)
             except ClientError as e:
-                logger.error(f"Error uploading file to S3: {str(e)}")
                 raise Exception(f"Error uploading file to S3: {str(e)}")
 
             # יצירת רשומת Attachment בבסיס הנתונים
@@ -205,18 +205,16 @@ class ForumService:
                                         post_id=post_id)
             db.session.add(new_attachment)
             db.session.commit()
-            logger.info(f"Successfully added attachment {new_attachment.id} to post {post_id}")
             return new_attachment
         except Exception as e:
-            logger.error(f"Error in add_attachment_to_post: {str(e)}", exc_info=True)
             db.session.rollback()
             # אם הייתה שגיאה, ננסה למחוק את הקובץ מ-S3 אם הוא הועלה
             try:
-                s3_client.delete_object(Bucket=s3_bucket_name, Key=s3_key)
-            except Exception as cleanup_error:
-                logger.error(f"Error cleaning up S3 object: {str(cleanup_error)}")
-            raise
-    
+                self.s3_client.delete_object(Bucket=self.s3_bucket_name, Key=s3_key)
+            except:
+                pass  # התעלם משגיאות בניקוי
+            raise Exception(f"Error adding attachment: {str(e)}")
+
     @staticmethod
     def delete_attachment(self, attachment_id):
         try:

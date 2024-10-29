@@ -4,9 +4,6 @@ from main_app.models.models import User, ForumPost
 from main_app.services.forum_service import ForumService
 from main_app.services.user_service import UserService
 from werkzeug.exceptions import BadRequest, NotFound, Unauthorized, Forbidden
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 forum_routes = Blueprint('forum', __name__)
@@ -299,10 +296,8 @@ def add_attachment(post_id):
         return jsonify(attachment.to_dict()), 201
     except BadRequest as e:
         return jsonify({"error": str(e)}), 400
-    except NotFound as e:
-        return jsonify({"error": str(e)}), 404
     except Exception as e:
-        return jsonify({"error": "An unexpected error occurred"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @forum_routes.route('/attachments/<int:attachment_id>', methods=['DELETE'])
 def delete_attachment(attachment_id):
