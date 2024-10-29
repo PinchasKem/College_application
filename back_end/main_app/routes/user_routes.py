@@ -166,3 +166,4 @@ def refresh():
         "is_guest": user.is_guest
     })
     return jsonify(access_token=new_access_token), 200
+
