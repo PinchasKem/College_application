@@ -4,7 +4,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), nullable=False)
+    firstname = db.Column(db.String(100), nullable=False)
+    lastname = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
     class_cycle = db.Column(db.Integer)
@@ -12,8 +13,9 @@ class User(db.Model):
     is_staff_member = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
     is_guest = db.Column(db.Boolean, default=True)
-    def __init__(self, username, email, class_cycle, password=None, is_student=False, is_staff_member=False, is_admin=False, is_guest=True):
-        self.username = username
+    def __init__(self, firstname, lastname, email, class_cycle, password=None, is_student=False, is_staff_member=False, is_admin=False, is_guest=True):
+        self.firstname = firstname
+        self.lastname = lastname
         self.email = email
         self.class_cycle = class_cycle
         self.is_student = is_student
@@ -30,12 +32,13 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
     
     def __repr__(self):
-        return f'<User {self.username}>'
+        return f'<User {self.firstname}>'
     
     def to_dict(self):
         return {
             'id': self.id,
-            'username': self.username,
+            'firstname': self.firstname,
+            'lastname': self.lastname,
             'email': self.email,
             'class_cycle': self.class_cycle,
             'is_student': self.is_student,
