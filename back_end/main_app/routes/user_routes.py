@@ -10,8 +10,8 @@ user_routes = Blueprint('user', __name__)
 def create_user():
     try:
         data = request.json
-        if not data or 'username' not in data or 'email' not in data or 'password' not in data or 'user_type' not in data:
-            raise BadRequest("Username, email, password, and user_type are required")
+        if not data or 'firstname' not in data or 'lastname' not in data or 'email' not in data or 'password' not in data or 'user_type' not in data:
+            raise BadRequest("firstname, lastname, email, password, and user_type are required")
 
         user_type = data['user_type']
         if user_type == 'is_admin':
@@ -25,7 +25,8 @@ def create_user():
             raise BadRequest("class_cycle is required for student registration")
 
         new_user = UserService.create_user(
-            data['username'],
+            data['firstname'],
+            data['lastname'],
             data['email'],
             data['class_cycle'] if user_type == 'student' else None,
             data['password'],
@@ -78,7 +79,8 @@ def get_users():
         users = UserService.get_all_users()
         return jsonify([{
             'id': user.id,
-            'username': user.username,
+            'firstname': user.firstname,
+            'lastname': user.lastname,
             'email': user.email,
             'role': 'admin' if user.is_admin else 'staff' if user.is_staff_member else 'student' if user.is_student else 'guest'
         } for user in users]), 200
@@ -92,7 +94,8 @@ def get_user(user_id):
         if user:
             return jsonify({
                 'id': user.id,
-                'username': user.username,
+                'firstname': user.firstname,
+                'lastname': user.lastname,
                 'email': user.email,
                 'role': 'admin' if user.is_admin else 'staff' if user.is_staff_member else 'student' if user.is_student else 'guest'
             }), 200

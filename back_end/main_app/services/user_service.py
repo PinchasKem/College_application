@@ -5,10 +5,11 @@ from main_app.extensions import db
 
 class UserService:
     @staticmethod
-    def create_user(username, email, class_cycle, password, is_student=False, is_staff_member=False, is_admin=False, is_guest=False):
+    def create_user(firstname, lastname, email, class_cycle, password, is_student=False, is_staff_member=False, is_admin=False, is_guest=False):
         try:
             new_user = User(
-                username=username,
+                firstname=firstname,
+                lastname=lastname,
                 email=email,
                 class_cycle=class_cycle,
                 password=password,
@@ -44,8 +45,10 @@ class UserService:
         user = User.query.get(user_id)
         if not user:
             return None
-        if 'username' in data:
-            user.username = data['username']
+        if 'firstname' in data:
+            user.firstname = data['firstname']
+        if 'lastname' in data:
+            user.lastname = data['lastname']
         if 'new_email' in data:
             user.email = data['new_email']
         if 'class_cycle' in data:
