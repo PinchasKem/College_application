@@ -6,6 +6,22 @@ from main_app.extensions import db
 from flask import current_app
 
 class ForumService:
+    
+    MAX_FILE_SIZE_MB = 10  # גודל מקסימלי של 10MB
+    ALLOWED_FILE_TYPES = {
+        # תמונות
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/gif': '.gif',
+        # מסמכים
+        'application/pdf': '.pdf',
+        'application/msword': '.doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+        # טקסט
+        'text/plain': '.txt',
+        'text/markdown': '.md',
+    }
+
     def __init__(self, s3_bucket_name):
         self.s3_client = boto3.client('s3',
             region_name=current_app.config['AWS_REGION'],
@@ -182,13 +198,34 @@ class ForumService:
             db.session.rollback()
             raise Exception(f"Error updating cluster: {str(e)}")
 
+    def validate_file(self, file_content, file_type, filename):
+       
+        # בדיקת גודל הקובץ
+        file_size_mb = len(file_content) / (1024 * 1024)  # המרה ל-MB
+        if file_size_mb > self.MAX_FILE_SIZE_MB:
+            return False, f"File size exceeds maximum allowed size of {self.MAX_FILE_SIZE_MB}MB"
 
+        # בדיקת סוג הקובץ
+        if file_type not in self.ALLOWED_FILE_TYPES:
+            return False, f"File type {file_type} is not allowed. Allowed types: {', '.join(self.ALLOWED_FILE_TYPES.values())}"
+
+        # בדיקה שסיומת הקובץ תואמת את סוג הקובץ
+        expected_extension = self.ALLOWED_FILE_TYPES[file_type]
+        if not filename.lower().endswith(expected_extension):
+            return False, f"File extension does not match the file type. Expected: {expected_extension}"
+
+        return True, ""
+    
     def add_attachment_to_post(self, post_id, filename, file_content, file_type):
         try:
             post = ForumPost.query.get(post_id)
             if not post:
                 raise Exception("Post not found")
             
+            is_valid, error_message = self.validate_file(file_content, file_type, filename)
+            if not is_valid:
+                raise Exception(f"Invalid file: {error_message}")
+
             # יצירת מפתח ייחודי עבור S3
             s3_key = f"attachments/{post_id}/{filename}"
 
@@ -215,7 +252,6 @@ class ForumService:
                 pass  # התעלם משגיאות בניקוי
             raise Exception(f"Error adding attachment: {str(e)}")
 
-    @staticmethod
     def delete_attachment(self, attachment_id):
         try:
             attachment = Attachment.query.get(attachment_id)
@@ -234,3 +270,20 @@ class ForumService:
         except Exception as e:
             db.session.rollback()
             raise Exception(f"Error deleting attachment: {str(e)}")
+
+    def get_attachment(self, attachment_id):
+        try:
+            attachment = Attachment.query.get(attachment_id)
+            if not attachment:
+                raise Exception("Attachment not found")
+                
+            # קבלת הקובץ מ-S3
+            response = self.s3_client.get_object(Bucket=self.s3_bucket_name, Key=attachment.s3_key)
+            file_data = response['Body'].read()
+            
+            return attachment, file_data
+        except ClientError as e:
+            raise Exception(f"Error retrieving file from S3: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Error retrieving attachment: {str(e)}")
+        

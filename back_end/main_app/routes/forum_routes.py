@@ -1,4 +1,5 @@
-from flask import jsonify, request, Blueprint, current_app
+import io
+from flask import jsonify, request, Blueprint, current_app, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from main_app.models.models import User, ForumPost
 from main_app.services.forum_service import ForumService
@@ -278,6 +279,7 @@ def get_all_clusters():
 
 
 @forum_routes.route('/posts/<int:post_id>/attachments', methods=['POST'])
+@jwt_required()
 def add_attachment(post_id):
     try:
         if 'file' not in request.files:
@@ -287,6 +289,18 @@ def add_attachment(post_id):
             raise BadRequest("No selected file")
         
         forum_service = get_forum_service()
+
+        post = forum_service.get_post_by_id(post_id)
+        
+        if not post:
+            raise NotFound("Post not found")
+
+        current_user_id = get_jwt_identity()
+        current_user = User.query.filter_by(id=current_user_id).first()
+
+        if current_user_id != post.author_id and not current_user.is_admin:
+            raise Forbidden("Only the author can add a file to post")
+
         attachment = forum_service.add_attachment_to_post(
             post_id, 
             file.filename, 
@@ -299,20 +313,50 @@ def add_attachment(post_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@forum_routes.route('/attachments/<int:attachment_id>', methods=['DELETE'])
-def delete_attachment(attachment_id):
+@forum_routes.route('/posts/<int:post_id>/attachments/<int:attachment_id>', methods=['DELETE'])
+@jwt_required()
+def delete_attachment(post_id, attachment_id):
     try:
-        user_id = request.headers.get('User-ID') 
-        if not UserService.is_admin(user_id):
-            raise Unauthorized("Only admins can delete attachments")
-
         forum_service = get_forum_service()
+
+        post = forum_service.get_post_by_id(post_id)
+        if not post:
+            raise NotFound("Post not found")
+
+        current_user_id = get_jwt_identity()
+        current_user = User.query.filter_by(id=current_user_id).first()
+
+        if current_user_id != post.author_id and not current_user.is_admin:
+            raise Forbidden("Only the author can delete the file from post")
+
         forum_service.delete_attachment(attachment_id)
         return '', 204
     except NotFound as e:
         return jsonify({"error": str(e)}), 404
     except Unauthorized as e:
         return jsonify({"error": str(e)}), 403
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@forum_routes.route('/attachments/<int:attachment_id>/download', methods=['GET'])
+def download_attachment(attachment_id):
+    try:
+        forum_service = get_forum_service()
+
+        try:
+            attachment, file_data = forum_service.get_attachment(attachment_id)
+        except Exception as e:
+            raise NotFound(str(e))
+
+        return send_file(
+            io.BytesIO(file_data),
+            download_name=attachment.filename,
+            mimetype=attachment.file_type,
+            as_attachment=True
+        )
+
+    except NotFound as e:
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
